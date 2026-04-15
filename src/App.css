@@ -5,15 +5,16 @@
 }
 
 .workspace-card {
-  background: #ffffff;
-  border: 1px solid #d9d9d9;
+  background: #fff7f2;
+  border: 1px solid #f4b183;
   border-radius: 8px;
   padding: 20px;
+  box-shadow: 0 8px 24px rgba(190, 24, 24, 0.08);
 }
 
 .intro-text {
   margin-bottom: 16px;
-  color: #555555;
+  color: #9a3412;
 }
 
 .classifier-form {
@@ -29,34 +30,48 @@
 
 .source-option {
   padding: 10px;
-  border: 1px solid #cccccc;
+  border: 1px solid #fdba74;
   border-radius: 6px;
-  background: #ffffff;
+  background: #fffaf7;
+  color: #9f1239;
 }
 
 .source-option.active {
-  background: #eeeeee;
-  border-color: #777777;
+  background: #fed7aa;
+  border-color: #ea580c;
 }
 
 .simple-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #cccccc;
+  border: 1px solid #fdba74;
   border-radius: 6px;
-  background: #ffffff;
+  background: #fffaf7;
+  color: #7c2d12;
 }
 
+.camera-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.camera-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.camera-frame,
 .preview-frame {
   min-height: 240px;
-  border: 1px solid #cccccc;
+  border: 1px solid #fdba74;
   border-radius: 6px;
-  background: #fafafa;
+  background: #fff1e6;
   display: grid;
   place-items: center;
   overflow: hidden;
 }
 
+.camera-frame video,
 .preview-frame img {
   width: 100%;
   height: 100%;
@@ -65,7 +80,7 @@
 
 .preview-text,
 .status-text {
-  color: #666666;
+  color: #9a3412;
 }
 
 .submit-row {
@@ -77,15 +92,28 @@
 
 .submit-button {
   padding: 10px 16px;
-  border: 1px solid #222222;
+  border: 1px solid #c2410c;
   border-radius: 6px;
-  background: #222222;
+  background: #dc2626;
   color: #ffffff;
 }
 
+.secondary-button {
+  padding: 10px 16px;
+  border: 1px solid #fb923c;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.secondary-button:disabled,
 .submit-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.hidden-canvas {
+  display: none;
 }
 
 @media (max-width: 640px) {
@@ -93,6 +121,7 @@
     grid-template-columns: 1fr;
   }
 
+  .camera-actions,
   .submit-row {
     flex-direction: column;
     align-items: stretch;

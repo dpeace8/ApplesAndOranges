@@ -2,8 +2,8 @@
   font-family: Arial, Helvetica, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #222222;
-  background: #f4f4f4;
+  color: #7f1d1d;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffe4d6 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -17,6 +17,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffe4d6 100%);
 }
 
 body,
@@ -43,13 +44,16 @@ p {
 h1 {
   margin-bottom: 12px;
   font-size: 32px;
+  color: #b91c1c;
 }
 
 h2 {
   margin-bottom: 6px;
   font-size: 24px;
+  color: #c2410c;
 }
 
 h3 {
   font-size: 18px;
+  color: #c2410c;
 }

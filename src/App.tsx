@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 
@@ -11,6 +11,10 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState('')
   const [status, setStatus] = useState('Choose an image to continue.')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [isCameraReady, setIsCameraReady] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     if (!selectedFile) {
@@ -24,6 +28,22 @@ function App() {
     return () => URL.revokeObjectURL(objectUrl)
   }, [imageUrl, mode, selectedFile])
 
+  useEffect(() => {
+    if (!cameraStream || !videoRef.current) {
+      return
+    }
+
+    videoRef.current.srcObject = cameraStream
+  }, [cameraStream])
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [cameraStream])
+
   const canSubmit = useMemo(() => {
     if (isSubmitting) {
       return false
@@ -36,7 +56,21 @@ function App() {
     return selectedFile !== null
   }, [imageUrl, isSubmitting, mode, selectedFile])
 
+  const stopCamera = () => {
+    if (!cameraStream) {
+      return
+    }
+
+    cameraStream.getTracks().forEach((track) => track.stop())
+    setCameraStream(null)
+    setIsCameraReady(false)
+  }
+
   const handleModeChange = (nextMode: SourceMode) => {
+    if (nextMode !== 'camera') {
+      stopCamera()
+    }
+
     setMode(nextMode)
     setImageUrl('')
     setSelectedFile(null)
@@ -47,6 +81,64 @@ function App() {
     const file = event.target.files?.[0] ?? null
     setSelectedFile(file)
     setStatus(file ? 'Image selected.' : 'Choose an image to continue.')
+  }
+
+  const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus('Camera is not supported in this browser.')
+      return
+    }
+
+    try {
+      stopCamera()
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      })
+
+      setCameraStream(stream)
+      setSelectedFile(null)
+      setStatus('Camera is on. Take a photo.')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not open the camera.'
+      setStatus(`Camera error: ${message}`)
+    }
+  }
+
+  const takePhoto = async () => {
+    const video = videoRef.current
+    const canvas = cameraCanvasRef.current
+
+    if (!video || !canvas || !isCameraReady) {
+      setStatus('Camera is not ready yet.')
+      return
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      setStatus('Could not capture the photo.')
+      return
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.95)
+    })
+
+    if (!blob) {
+      setStatus('Could not capture the photo.')
+      return
+    }
+
+    const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' })
+    setSelectedFile(file)
+    setStatus('Photo captured.')
+    stopCamera()
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -136,15 +228,54 @@ function App() {
               }}
               placeholder="Enter image URL"
             />
-          ) : (
+          ) : null}
+
+          {mode === 'upload' ? (
             <input
               className="simple-input"
               type="file"
               accept="image/*"
-              capture={mode === 'camera' ? 'environment' : undefined}
               onChange={handleFileChange}
             />
-          )}
+          ) : null}
+
+          {mode === 'camera' ? (
+            <div className="camera-panel">
+              <div className="camera-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={startCamera}
+                >
+                  Open camera
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={takePhoto}
+                  disabled={!cameraStream}
+                >
+                  Take photo
+                </button>
+              </div>
+
+              <div className="camera-frame">
+                {cameraStream ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    onLoadedMetadata={() => setIsCameraReady(true)}
+                  />
+                ) : (
+                  <span className="preview-text">Camera is off</span>
+                )}
+              </div>
+
+              <canvas ref={cameraCanvasRef} className="hidden-canvas" />
+            </div>
+          ) : null}
 
           <div className="preview-frame">
             {previewUrl ? (
