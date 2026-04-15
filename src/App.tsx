@@ -1,120 +1,168 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 
+type SourceMode = 'url' | 'upload' | 'camera'
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [mode, setMode] = useState<SourceMode>('url')
+  const [imageUrl, setImageUrl] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [status, setStatus] = useState('Choose an image to continue.')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(mode === 'url' ? imageUrl.trim() : '')
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(selectedFile)
+    setPreviewUrl(objectUrl)
+
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [imageUrl, mode, selectedFile])
+
+  const canSubmit = useMemo(() => {
+    if (isSubmitting) {
+      return false
+    }
+
+    if (mode === 'url') {
+      return imageUrl.trim().length > 0
+    }
+
+    return selectedFile !== null
+  }, [imageUrl, isSubmitting, mode, selectedFile])
+
+  const handleModeChange = (nextMode: SourceMode) => {
+    setMode(nextMode)
+    setImageUrl('')
+    setSelectedFile(null)
+    setStatus('Choose an image to continue.')
+  }
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setSelectedFile(file)
+    setStatus(file ? 'Image selected.' : 'Choose an image to continue.')
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!canSubmit) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setStatus('Submitting...')
+
+    try {
+      const payload =
+        mode === 'url'
+          ? { sourceType: 'url', imageUrl: imageUrl.trim() }
+          : { sourceType: mode, fileName: selectedFile?.name ?? '' }
+
+      const response = await fetch('/todo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      setStatus('Submitted.')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to reach the endpoint.'
+      setStatus(`Error: ${message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main className="app-shell">
+      <div className="workspace-card">
+        <h1>Apple and Orange Classifier</h1>
+        <p className="intro-text">
+          Add an image by URL, upload, or camera, then submit it to the demo
+          endpoint.
+        </p>
 
-      <div className="ticks"></div>
+        <form className="classifier-form" onSubmit={handleSubmit}>
+          <div className="source-grid">
+            <button
+              type="button"
+              className={`source-option ${mode === 'url' ? 'active' : ''}`}
+              onClick={() => handleModeChange('url')}
+            >
+              URL
+            </button>
+            <button
+              type="button"
+              className={`source-option ${mode === 'upload' ? 'active' : ''}`}
+              onClick={() => handleModeChange('upload')}
+            >
+              Upload
+            </button>
+            <button
+              type="button"
+              className={`source-option ${mode === 'camera' ? 'active' : ''}`}
+              onClick={() => handleModeChange('camera')}
+            >
+              Camera
+            </button>
+          </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          {mode === 'url' ? (
+            <input
+              className="simple-input"
+              type="url"
+              value={imageUrl}
+              onChange={(event) => {
+                setImageUrl(event.target.value)
+                setStatus(
+                  event.target.value.trim()
+                    ? 'Image URL added.'
+                    : 'Choose an image to continue.',
+                )
+              }}
+              placeholder="Enter image URL"
+            />
+          ) : (
+            <input
+              className="simple-input"
+              type="file"
+              accept="image/*"
+              capture={mode === 'camera' ? 'environment' : undefined}
+              onChange={handleFileChange}
+            />
+          )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          <div className="preview-frame">
+            {previewUrl ? (
+              <img src={previewUrl} alt="Preview" />
+            ) : (
+              <span className="preview-text">No image selected</span>
+            )}
+          </div>
+
+          <div className="submit-row">
+            <span className="status-text">{status}</span>
+            <button className="submit-button" type="submit" disabled={!canSubmit}>
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
   )
 }
 
