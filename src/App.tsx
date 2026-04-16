@@ -4,6 +4,19 @@ import './App.css'
 
 type SourceMode = 'url' | 'upload' | 'camera'
 
+type PredictionResponse = {
+  filename: string
+  predicted_label: string
+  class_names: string[]
+  scores: Record<string, number>
+  raw_model_output: number[]
+  image_base64: string
+  image_mime_type: string
+}
+
+const PREDICT_ENDPOINT =
+  'https://applesandoranges-844936301843.us-south1.run.app/predict'
+
 function App() {
   const [mode, setMode] = useState<SourceMode>('url')
   const [imageUrl, setImageUrl] = useState('')
@@ -13,6 +26,7 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
   const [isCameraReady, setIsCameraReady] = useState(false)
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -66,6 +80,8 @@ function App() {
     setIsCameraReady(false)
   }
 
+  const resetPrediction = () => setPrediction(null)
+
   const handleModeChange = (nextMode: SourceMode) => {
     if (nextMode !== 'camera') {
       stopCamera()
@@ -75,12 +91,14 @@ function App() {
     setImageUrl('')
     setSelectedFile(null)
     setStatus('Choose an image to continue.')
+    resetPrediction()
   }
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setSelectedFile(file)
     setStatus(file ? 'Image selected.' : 'Choose an image to continue.')
+    resetPrediction()
   }
 
   const startCamera = async () => {
@@ -98,6 +116,7 @@ function App() {
       setCameraStream(stream)
       setSelectedFile(null)
       setStatus('Camera is on. Take a photo.')
+      resetPrediction()
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Could not open the camera.'
@@ -138,7 +157,34 @@ function App() {
     const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' })
     setSelectedFile(file)
     setStatus('Photo captured.')
+    resetPrediction()
     stopCamera()
+  }
+
+  const buildFileFromUrl = async (url: string) => {
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`Could not load image URL (${response.status}).`)
+    }
+
+    const blob = await response.blob()
+    const mimeType = blob.type || 'image/jpeg'
+    const extension = mimeType.split('/')[1] || 'jpg'
+
+    return new File([blob], `image-from-url.${extension}`, { type: mimeType })
+  }
+
+  const getFileForSubmission = async () => {
+    if (mode === 'url') {
+      return buildFileFromUrl(imageUrl.trim())
+    }
+
+    if (!selectedFile) {
+      throw new Error('Choose an image first.')
+    }
+
+    return selectedFile
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -150,26 +196,28 @@ function App() {
 
     setIsSubmitting(true)
     setStatus('Submitting...')
+    resetPrediction()
 
     try {
-      const payload =
-        mode === 'url'
-          ? { sourceType: 'url', imageUrl: imageUrl.trim() }
-          : { sourceType: mode, fileName: selectedFile?.name ?? '' }
+      const file = await getFileForSubmission()
+      const formData = new FormData()
+      formData.append('file', file, file.name)
 
-      const response = await fetch('/todo', {
+      const response = await fetch(PREDICT_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          accept: 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: formData,
       })
 
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`)
       }
 
-      setStatus('Submitted.')
+      const data = (await response.json()) as PredictionResponse
+      setPrediction(data)
+      setStatus(`Prediction: ${data.predicted_label}`)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to reach the endpoint.'
@@ -179,13 +227,16 @@ function App() {
     }
   }
 
+  const resultImageSrc = prediction
+    ? `data:${prediction.image_mime_type};base64,${prediction.image_base64}`
+    : ''
+
   return (
     <main className="app-shell">
       <div className="workspace-card">
         <h1>Apple and Orange Classifier</h1>
         <p className="intro-text">
-          Add an image by URL, upload, or camera, then submit it to the demo
-          endpoint.
+          Add an image by URL, upload, or camera, then submit it for prediction.
         </p>
 
         <form className="classifier-form" onSubmit={handleSubmit}>
@@ -225,6 +276,7 @@ function App() {
                     ? 'Image URL added.'
                     : 'Choose an image to continue.',
                 )
+                resetPrediction()
               }}
               placeholder="Enter image URL"
             />
@@ -292,6 +344,31 @@ function App() {
             </button>
           </div>
         </form>
+
+        {prediction ? (
+          <section className="result-card">
+            <h2>Result</h2>
+            <p className="result-label">
+              Prediction: <strong>{prediction.predicted_label}</strong>
+            </p>
+            <p className="result-file">File: {prediction.filename}</p>
+
+            <div className="scores-list">
+              {prediction.class_names.map((className) => (
+                <div key={className} className="score-row">
+                  <span>{className}</span>
+                  <strong>{prediction.scores[className]?.toFixed(2) ?? '0.00'}%</strong>
+                </div>
+              ))}
+            </div>
+
+            {resultImageSrc ? (
+              <div className="result-image-frame">
+                <img src={resultImageSrc} alt="Prediction result" />
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </main>
   )
